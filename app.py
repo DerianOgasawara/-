@@ -3,7 +3,7 @@ import gspread
 from datetime import datetime
 
 # 実験プログラムを直接インポート（仲介ファイルなし）
-import my_experiment
+import experiment
 
 def get_spreadsheet():
     credentials = st.secrets["gcp_service_account"]
@@ -19,7 +19,7 @@ if participant_id:
     st.divider()
     
     # インポートした実験プログラムを実行してデータを受け取る
-    exp_data = my_experiment.run()
+    exp_data = experiment.run()
     
     st.divider()
 
