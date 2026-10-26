@@ -82,10 +82,7 @@ def run():
             st.rerun()
             
         return {
-            "status": "not_started",
-            "eval_mode": EVAL_MODE,
-            "total_trials": 0,
-            "results_json": "[]"
+            "status": "not_started"
         }
 
     # ---------------------------------------------------------
@@ -172,10 +169,7 @@ def run():
             st.rerun()
             
         return {
-            "status": "in_progress",
-            "eval_mode": EVAL_MODE,
-            "total_trials": total,
-            "results_json": json.dumps(st.session_state.results, ensure_ascii=False)
+            "status": "in_progress"
         }
 
     # ---------------------------------------------------------
@@ -184,12 +178,17 @@ def run():
     if st.session_state.exp_finished:
         st.success("🎉 全ての試行が完了しました！画面下の「回答を送信する」ボタンを押して送信を完了してください。")
         
-        return {
-            "status": "completed",
-            "eval_mode": EVAL_MODE,
-            "total_trials": len(st.session_state.results),
-            "results_json": json.dumps(st.session_state.results, ensure_ascii=False)
-        }
+        # ① semitones（半音数）の昇順（0, 1, 2...）に並び替え
+        sorted_results = sorted(st.session_state.results, key=lambda r: r["semitones"])
+        
+        # ② status を含めた返却用辞書を作成
+        res = {"status": "completed"}
+        
+        # ③ ソートされた順に semitones ごとの rating を辞書に追加
+        for item in sorted_results:
+            res[f"semitone_{item['semitones']}"] = item["rating"]
+            
+        return res
 
 # ------------------------------------------------------------------------------
 # 単体テスト用 (`streamlit run experiment.py` で単体起動可能)
