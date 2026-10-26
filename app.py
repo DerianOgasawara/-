@@ -29,7 +29,7 @@ if participant_id:
 
     # 1. 既に送信が完了している場合
     if st.session_state.submitted:
-        st.success("回答は正常に保存されました。ご協力ありがとうございました！\n タブを閉じて終了してください")
+        st.success("回答は正常に保存されました。ご協力ありがとうございました！\n タブを閉じて終了してください。")
 
     # 2. 実験が完了しており、まだ送信していない場合（送信ボタンを表示）
     elif exp_data.get("status") == "completed":
