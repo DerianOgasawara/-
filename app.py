@@ -11,15 +11,35 @@ def get_spreadsheet():
     sh = gc.open_by_url(st.secrets["spreadsheet_url"])
     return sh.sheet1
 
-# 送信済みフラグの初期化
+# セッション状態の初期化
 if "submitted" not in st.session_state:
     st.session_state.submitted = False
+if "participant_id" not in st.session_state:
+    st.session_state.participant_id = ""
+if "id_confirmed" not in st.session_state:
+    st.session_state.id_confirmed = False
 
 st.title("Web実験")
 
-participant_id = st.text_input("名前を入力してください。入力したらEnterを押してください。")
+# ---------------------------------------------------------
+# ID入力・確定処理
+# ---------------------------------------------------------
+# IDが未確定の場合：入力欄と確定ボタンを表示
+if not st.session_state.id_confirmed:
+    input_id = st.text_input("名前を入力してください:")
+    
+    if st.button("名前を確定して実験へ進む", type="primary"):
+        if not input_id.strip():
+            st.warning("名前を入力してください。")
+        else:
+            st.session_state.participant_id = input_id.strip()
+            st.session_state.id_confirmed = True
+            st.rerun()
 
-if participant_id:
+# ID確定後：入力欄を消し、確定したIDを固定表示して変更不可にする
+else:
+    st.info(f"**名前:** {st.session_state.participant_id}")
+    
     st.divider()
     
     # インポートした実験プログラムを実行してデータを受け取る
@@ -29,7 +49,7 @@ if participant_id:
 
     # 1. 既に送信が完了している場合
     if st.session_state.submitted:
-        st.success("回答は正常に保存されました。ご協力ありがとうございました！\n タブを閉じて終了してください。")
+        st.success("回答は正常に保存されました。ご協力ありがとうございました！\n タブを閉じてください。")
 
     # 2. 実験が完了しており、まだ送信していない場合（送信ボタンを表示）
     elif exp_data.get("status") == "completed":
@@ -37,7 +57,7 @@ if participant_id:
             try:
                 sheet = get_spreadsheet()
                 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                row_data = [timestamp, participant_id] + list(exp_data.values())
+                row_data = [timestamp, st.session_state.participant_id] + list(exp_data.values())
                 
                 sheet.append_row(row_data)
                 
