@@ -17,7 +17,7 @@ if "submitted" not in st.session_state:
 
 st.title("Web実験")
 
-participant_id = st.text_input("被験者IDを入力してください:")
+participant_id = st.text_input("名前を入力してください:")
 
 if participant_id:
     st.divider()
