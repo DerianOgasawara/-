@@ -1,10 +1,10 @@
 """
 experiment.py
-Streamlit用 協和度評価 心理実験モジュール
-（ソースコード内で評価方式・反復回数を固定指定し、被験者側の選択を制限）
+Streamlit用 協和度評価 心理実験モジュール（二者択一専用一対比較法）
 """
 
 import random
+import itertools
 import json
 import streamlit as st
 
@@ -12,13 +12,10 @@ from intervals import get_interval_data
 from audio_loader import load_interval_audio
 
 # ==============================================================================
-# 実験設定（ソースコード側で事前に指定してください）
+# 実験設定
 # ==============================================================================
-# EVAL_MODE: "4step" (四択ボタン), "2step" (二択ボタン), "slider" (スライダー)
-EVAL_MODE = "4step"
-
-# 各音程の反復再生回数 (全13音程 × REPEATS 試行)
-REPEATS = 1
+# 1回の実験で行う試行数
+NUM_TRIALS = 5
 # ==============================================================================
 
 
@@ -35,30 +32,51 @@ def init_session_state():
     if "exp_finished" not in st.session_state:
         st.session_state.exp_finished = False
 
-def generate_trial_list(repeats=3):
-    """全13音程データのランダムな試行リストを生成"""
+
+def generate_trial_list(num_trials=5):
+    """
+    指定された試行数に合わせてランダムな比較ペアリストを生成
+    """
     intervals = get_interval_data()
+    base_pairs = list(itertools.combinations(intervals, 2))  # 全78ペア
+    
+    if num_trials <= len(base_pairs):
+        selected_pairs = random.sample(base_pairs, num_trials)
+    else:
+        selected_pairs = [random.choice(base_pairs) for _ in range(num_trials)]
+        
     trials = []
-    for rep in range(repeats):
-        shuffled = intervals.copy()
-        random.shuffle(shuffled)
-        for item in shuffled:
-            trials.append({
-                "repeat_id": rep + 1,
-                "name": item["name"],
-                "filename": item["filename"],
-                "num": item["ratio"][0],
-                "den": item["ratio"][1],
-                "semitones": item["semitones"]
-            })
+    for idx, (item_a, item_b) in enumerate(selected_pairs):
+        # AとBの提示順序（左右）をランダムに決定
+        if random.choice([True, False]):
+            first, second = item_a, item_b
+        else:
+            first, second = item_b, item_a
+            
+        trials.append({
+            "trial_id": idx + 1,
+            "interval_a": {
+                "name": first["name"],
+                "filename": first["filename"],
+                "ratio": f"{first['ratio'][0]}:{first['ratio'][1]}",
+                "semitones": first["semitones"]
+            },
+            "interval_b": {
+                "name": second["name"],
+                "filename": second["filename"],
+                "ratio": f"{second['ratio'][0]}:{second['ratio'][1]}",
+                "semitones": second["semitones"]
+            }
+        })
     return trials
+
 
 def run():
     """
-    実験の表示・進行処理を行い、app.py (スプレッドシート保存) に引き渡すための辞書データを返すメイン関数
+    実験の表示・進行処理を行い、完了時に13x13行列化に最適化したデータを返すメイン関数
     """
     init_session_state()
-    st.subheader("🎵 和音の協和度評価タスク")
+    st.subheader("🎵 和音の協和度比較タスク")
     
     # ---------------------------------------------------------
     # 1. 実験案内画面（未開始時）
@@ -66,24 +84,21 @@ def run():
     if not st.session_state.exp_started and not st.session_state.exp_finished:
         st.markdown("""
         **【実験手順】**
-        1. 提示される2音の和音（ピアノ録音音源）をよく聴いてください。
-        2. その和音の響きが「どの程度協和（きれい・まとまっている）しているか」を直感で回答してください。
+        1. 提示される **「音程 A」** と **「音程 B」** の2つの和音を聴き比べてください。
+        2. 2つのうち、**どちらがより「協和（きれい・まとまっている）している」と感じるか** 直感で回答してください。
         """)
         
-        total_trials = 13 * REPEATS
-        st.info(f"全 **{total_trials}** 試行のタスクを実施します。準備ができたら以下のボタンを押してください。")
+        st.info(f"全 **{NUM_TRIALS}** 試行の比較タスクを実施します。準備ができたら以下のボタンを押してください。")
         
         if st.button("実験を開始する", type="primary"):
-            st.session_state.trials = generate_trial_list(repeats=REPEATS)
+            st.session_state.trials = generate_trial_list(num_trials=NUM_TRIALS)
             st.session_state.current_trial_idx = 0
             st.session_state.results = []
             st.session_state.exp_started = True
             st.session_state.exp_finished = False
             st.rerun()
             
-        return {
-            "status": "not_started"
-        }
+        return {"status": "not_started"}
 
     # ---------------------------------------------------------
     # 2. 実験タスク画面（進行中）
@@ -98,67 +113,56 @@ def run():
         st.progress((idx) / total)
         st.caption(f"試行進捗: {idx + 1} / {total}")
         
-        # 録音WAVファイルの読み込みと再生
-        audio_bytes = load_interval_audio(current["filename"])
+        st.markdown("##### 🔊 2つの音声を聴き比べてください")
         
-        st.markdown("##### 🔊 以下の音声を聴いて評価してください")
-        st.audio(audio_bytes, format="audio/wav")
+        # 音程Aと音程Bを横並びで表示・再生
+        col_a, col_b = st.columns(2)
         
-        selected_rating = None
+        with col_a:
+            st.markdown("### 🅰️ 音程 A")
+            audio_a = load_interval_audio(current["interval_a"]["filename"])
+            st.audio(audio_a, format="audio/wav")
+            
+        with col_b:
+            st.markdown("### 🅱️ 音程 B")
+            audio_b = load_interval_audio(current["interval_b"]["filename"])
+            st.audio(audio_b, format="audio/wav")
+        
+        st.write("---")
+        st.write("**どちらの和音のほうが協和していると感じますか？**")
+        
+        selected_choice = None
 
-        # A. 四択方式 (ボタンを押すと自動で次へ)
-        if EVAL_MODE == "4step":
-            st.write("**この和音の響きをどう感じますか？**")
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                if st.button("不協和", key=f"btn_4_0_{idx}", use_container_width=True):
-                    selected_rating = 0.0
-            with col2:
-                if st.button("やや不協和", key=f"btn_4_33_{idx}", use_container_width=True):
-                    selected_rating = 0.33
-            with col3:
-                if st.button("やや協和", key=f"btn_4_67_{idx}", use_container_width=True):
-                    selected_rating = 0.67
-            with col4:
-                if st.button("協和", key=f"btn_4_100_{idx}", use_container_width=True):
-                    selected_rating = 1.0
+        # 二択ボタン
+        btn_col1, btn_col2 = st.columns(2)
+        with btn_col1:
+            if st.button("🅰️ 音程 A の方が協和している", key=f"btn_a_{idx}", use_container_width=True):
+                selected_choice = "A"
+        with btn_col2:
+            if st.button("🅱️ 音程 B の方が協和している", key=f"btn_b_{idx}", use_container_width=True):
+                selected_choice = "B"
 
-        # B. 二択方式 (ボタンを押すと自動で次へ)
-        elif EVAL_MODE == "2step":
-            st.write("**この和音の響きをどう感じますか？**")
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("不協和", key=f"btn_2_0_{idx}", use_container_width=True):
-                    selected_rating = 0.0
-            with col2:
-                if st.button("協和", key=f"btn_2_100_{idx}", use_container_width=True):
-                    selected_rating = 1.0
+        # 回答入力後のデータ記録と遷移処理
+        if selected_choice is not None:
+            semi_a = current["interval_a"]["semitones"]
+            semi_b = current["interval_b"]["semitones"]
+            
+            # 勝者・敗者の半音数を確定
+            if selected_choice == "A":
+                winner_semi = semi_a
+                loser_semi = semi_b
+            else:
+                winner_semi = semi_b
+                loser_semi = semi_a
 
-        # C. スライダー方式
-        elif EVAL_MODE == "slider":
-            with st.form(key=f"slider_form_{idx}"):
-                st.write("**協和度を 0.00 (非常に不協和) 〜 1.00 (非常に協和) で評価してください:**")
-                slider_val = st.slider(
-                    "協和度",
-                    min_value=0.0,
-                    max_value=1.0,
-                    value=0.5,
-                    step=0.01,
-                    key=f"slider_{idx}"
-                )
-                submitted = st.form_submit_button("回答して次へ進む ➔")
-                if submitted:
-                    selected_rating = slider_val
-
-        # 回答が入力された場合の記録と次の試行への遷移
-        if selected_rating is not None:
             st.session_state.results.append({
-                "trial_idx": idx + 1,
-                "repeat_id": current["repeat_id"],
-                "interval_name": current["name"],
-                "ratio": f"{current['num']}:{current['den']}",
-                "semitones": current["semitones"],
-                "rating": selected_rating
+                "trial_no": idx + 1,
+                "semitones_a": semi_a,
+                "semitones_b": semi_b,
+                "choice": selected_choice,             # "A" or "B"
+                "winner_semitone": winner_semi,       # 勝者の半音数 (0~12)
+                "loser_semitone": loser_semi,         # 敗者の半音数 (0~12)
+                "pair_key": f"{min(semi_a, semi_b)}-{max(semi_a, semi_b)}" # 比較ペア識別キー
             })
             
             if idx + 1 < total:
@@ -168,31 +172,28 @@ def run():
                 st.session_state.exp_finished = True
             st.rerun()
             
-        return {
-            "status": "in_progress"
-        }
+        return {"status": "in_progress"}
 
     # ---------------------------------------------------------
     # 3. 実験完了画面
     # ---------------------------------------------------------
     if st.session_state.exp_finished:
-        st.success("🎉 全ての試行が完了しました！画面下の「回答を送信する」ボタンを押して送信を完了してください。")
+        st.success("🎉 全ての比較試行が完了しました！画面下の「回答を送信する」ボタンを押してください。")
         
-        # ① semitones（半音数）の昇順（0, 1, 2...）に並び替え
-        sorted_results = sorted(st.session_state.results, key=lambda r: r["semitones"])
-        
-        # ② status を含めた返却用辞書を作成
-        res = {"status": "completed"}
-        
-        # ③ ソートされた順に semitones ごとの rating を辞書に追加
-        for item in sorted_results:
-            res[f"semitone_{item['semitones']}"] = item["rating"]
-            
-        return res
+        payload = {
+            "num_trials": NUM_TRIALS,
+            "trials": st.session_state.results
+        }
+
+        return {
+            "status": "completed",
+            "results_json": json.dumps(payload, ensure_ascii=False)
+        }
+
 
 # ------------------------------------------------------------------------------
 # 単体テスト用 (`streamlit run experiment.py` で単体起動可能)
 # ------------------------------------------------------------------------------
 if __name__ == "__main__":
-    st.set_page_config(page_title="協和度評価タスク", layout="wide")
+    st.set_page_config(page_title="協和度比較タスク", layout="wide")
     data = run()
