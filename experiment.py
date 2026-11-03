@@ -76,7 +76,7 @@ def run():
     実験の表示・進行処理を行い、完了時に13x13行列化に最適化したデータを返すメイン関数
     """
     init_session_state()
-    st.subheader("🎵 和音の協和度比較タスク")
+    st.subheader("協和度比較実験")
     
     # ---------------------------------------------------------
     # 1. 実験案内画面（未開始時）
@@ -113,7 +113,7 @@ def run():
         st.progress((idx) / total)
         st.caption(f"試行進捗: {idx + 1} / {total}")
         
-        st.markdown("##### 🔊 2つの音声を聴き比べてください")
+        st.markdown("##### 2つの音声を聴き比べてください")
         
         # 音程Aと音程Bを横並びで表示・再生
         col_a, col_b = st.columns(2)
