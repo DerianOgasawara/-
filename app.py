@@ -26,7 +26,7 @@ st.title("Web実験")
 # ---------------------------------------------------------
 # IDが未確定の場合：入力欄と確定ボタンを表示
 if not st.session_state.id_confirmed:
-    input_id = st.text_input("名前を入力してください:")
+    input_id = st.text_input("名前を入力してください（二度目以降の実験には同じ名前を使用してください）")
     
     if st.button("名前を確定して実験へ進む", type="primary"):
         if not input_id.strip():
