@@ -9,7 +9,7 @@ import json
 import streamlit as st
 
 from intervals import get_interval_data
-from audio_loader import load_interval_audio
+from audio_loader import load_interval_audio, get_current_trial_base_note
 
 # ==============================================================================
 # 実験設定
@@ -157,6 +157,7 @@ def run():
 
             st.session_state.results.append({
                 "trial_no": idx + 1,
+                "played_base_note": get_current_trial_base_note(), # 試行ごとに再生された基準音
                 "semitones_a": semi_a,
                 "semitones_b": semi_b,
                 "choice": selected_choice,             # "A" or "B"
