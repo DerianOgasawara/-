@@ -1,6 +1,7 @@
 import streamlit as st
 import gspread
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 # 実験プログラムを直接インポート
 import experiment
@@ -56,7 +57,7 @@ else:
         if st.button("回答を送信する", type="primary"):
             try:
                 sheet = get_spreadsheet()
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                timestamp = datetime.now(ZoneInfo("Asia/Tokyo")).strftime("%Y-%m-%d %H:%M:%S")
                 row_data = [timestamp, st.session_state.participant_id] + list(exp_data.values())
                 
                 sheet.append_row(row_data)
